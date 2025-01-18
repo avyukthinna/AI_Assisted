@@ -25,10 +25,10 @@ alpha = 0.4
 previous_depth = 0.0
 
 last_audio_time = 0  # Track the time of the last audio feedback
-audio_interval = 7  # Set the interval between audio feedback (in seconds)
+audio_interval = 3  # Set the interval between audio feedback (in seconds)
 
 # Queue for passing distance messages to the speech thread
-speech_queue = Queue()
+speech_queue = Queue(maxsize=1)
 
 def apply_ema_filter(current_depth):
     """Apply exponential moving average for depth smoothing."""
@@ -41,12 +41,24 @@ def depth_to_distance(depth_value, depth_scale=1.0):
     """Convert normalized depth value to approximate distance."""
     return 1.0 / (depth_value * depth_scale) if depth_value > 0 else float('inf')
 
+def add_to_speech_queue(message):
+    try:
+        if not speech_queue.empty():
+            speech_queue.get_nowait()  # Remove the existing message
+
+        # Add the new message to the queue
+        speech_queue.put_nowait(message)
+
+    except Exception as e:
+        print(f"[Queue Error]: {e}")
+
 def speak():
     """Function to handle text-to-speech in a separate thread using gTTS."""
     while True:
         try:
             # Wait for a message from the main loop
-            message = speech_queue.get(timeout=1)  # Wait for a maximum of 1 second for a message
+            message = speech_queue.get(timeout=0)  # Wait for a maximum of 1 second for a message
+            print(message)
             if message:
                 tts = gTTS(text=message, lang='en')
                 tts.save("temp.mp3")  # Save the audio to a temporary file
@@ -63,6 +75,7 @@ speech_thread.start()
 # Start video capture
 cap = cv2.VideoCapture(0)
 
+last_audio_times = {}
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
@@ -97,7 +110,7 @@ while cap.isOpened():
         for idx, box in enumerate(boxes):
             confidence = confidences[idx]
             
-            if confidence > 0.5:  # Filter low-confidence detections
+            if confidence > 0.7:  # Filter low-confidence detections
                 x1, y1, x2, y2 = map(int, box)
                 class_name = results[0].names[class_ids[idx]]
 
@@ -105,7 +118,13 @@ while cap.isOpened():
                 mid_x = int((x1 + x2) / 2)
                 mid_y = int((y1 + y2) / 2)
                 bbox_center = (x1 + x2) // 2
-                direction = "to your right" if bbox_center > frame_width // 2 else "to your left"
+                if bbox_center > (frame_width // 2) + 80:
+                    direction = "to your right"
+                elif bbox_center < (frame_width // 2) - 80:
+                    direction = 'to your left'
+                else:
+                    direction = ''
+                #direction = "to your right" if bbox_center > frame_width // 2 else "to your left"
                 if 0 <= mid_x < output_norm.shape[1] and 0 <= mid_y < output_norm.shape[0]:
                     depth_value = output_norm[mid_y, mid_x]
                     distance = depth_to_distance(depth_value)
@@ -118,11 +137,12 @@ while cap.isOpened():
 
                     # Prepare distance message for speech thread
                     distance_message = f"{class_name} is approximately {filtered_distance:.1f} meters {direction}"
-                    if current_time - last_audio_time >= audio_interval:
+                    current_time = time.time()
+                    if class_name not in last_audio_times or (current_time - last_audio_times[class_name] >= audio_interval):
                         try:
                             # Put the message in the speech queue for the speech thread to handle
-                            speech_queue.put(distance_message)
-                            print(speech_queue)
+                            add_to_speech_queue(distance_message)
+                            last_audio_times[class_name] = current_time
                             last_audio_time = current_time
                         except Exception as e:
                             print(f"[Audio Error]: {e}")
