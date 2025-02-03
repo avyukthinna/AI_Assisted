@@ -1,0 +1,47 @@
+# YAML configuration for YOLO training
+train: /Users/avyukthinna/Documents/AI Assisted/datasets/split_dataset/images/train  # Path to the training images directory
+val: /Users/avyukthinna/Documents/AI Assisted/datasets/split_dataset/images/val    # Path to the validation images directory
+test: /Users/avyukthinna/Documents/AI Assisted/datasets/split_dataset/images/test
+# Number of classes
+nc: 38
+
+# Class names
+names:
+  0: cars-bikes-people
+  1: Bus
+  2: Bushes
+  3: Person
+  4: Truck
+  5: backpack
+  6: bench
+  7: bicycle
+  8: boat
+  9: branch
+  10: car
+  11: chair
+  12: clock
+  13: crosswalk
+  14: door
+  15: elevator
+  16: fire_hydrant
+  17: green_light
+  18: gun
+  19: handbag
+  20: motorcycle
+  21: person
+  22: pothole
+  23: rat
+  24: red_light
+  25: scooter
+  26: sheep
+  27: stairs
+  28: stop_sign
+  29: suitcase
+  30: traffic light
+  31: traffic_cone
+  32: train
+  33: tree
+  34: truck
+  35: umbrella
+  36: yellow_light
+  37: text_region
